@@ -1,0 +1,2476 @@
+{
+  "datasets": [
+    {
+      "name": "a5ac6f73",
+      "displayName": "mau",
+      "queryLines": [
+        "SELECT * FROM workspace.scribd_exercise.metrics_mau WHERE month_start >= DATE'2023-01-01'"
+      ]
+    },
+    {
+      "name": "3531849e",
+      "displayName": "active_subscribers",
+      "queryLines": [
+        "SELECT * FROM workspace.scribd_exercise.metrics_active_subscribers WHERE month_end >= DATE'2023-01-31'"
+      ]
+    },
+    {
+      "name": "f3d334b4",
+      "displayName": "mrr",
+      "queryLines": [
+        "SELECT * FROM workspace.scribd_exercise.metrics_mrr WHERE month_end >= DATE'2023-01-31'"
+      ]
+    },
+    {
+      "name": "bb76b21b",
+      "displayName": "churn",
+      "queryLines": [
+        "SELECT *,\r\n",
+        "       CONCAT(DATE_FORMAT(window_end, 'yyyy-MM'), ' (', DATE_FORMAT(window_start, 'MMM'), '–', DATE_FORMAT(window_end, 'MMM'), ')') AS window_label\r\n",
+        "FROM workspace.scribd_exercise.metrics_churn\r\n",
+        "WHERE window_end >= DATE'2025-02-28'\r\n",
+        "  AND MONTH(window_end) IN (2, 5, 8, 11)"
+      ]
+    },
+    {
+      "name": "4222dd6c",
+      "displayName": "title_mau",
+      "queryLines": [
+        "SELECT business_id,\r\n",
+        "       DATE_FORMAT(month_start, 'yyyy-MM') AS month,\r\n",
+        "       mau AS value\r\n",
+        "FROM workspace.scribd_exercise.metrics_mau\r\n",
+        "WHERE month_start >= DATE'2023-01-01'"
+      ]
+    },
+    {
+      "name": "2f9b64f0",
+      "displayName": "title_paid_subscribers",
+      "queryLines": [
+        "SELECT business_id,\r\n",
+        "       DATE_FORMAT(month_end, 'yyyy-MM') AS month,\r\n",
+        "       active_paid_subscribers AS value\r\n",
+        "FROM workspace.scribd_exercise.metrics_active_subscribers\r\n",
+        "WHERE month_end >= DATE'2023-01-31'"
+      ]
+    },
+    {
+      "name": "d3bd0016",
+      "displayName": "title_mrr",
+      "queryLines": [
+        "SELECT business_id,\r\n",
+        "       DATE_FORMAT(month_end, 'yyyy-MM') AS month,\r\n",
+        "       mrr_usd AS value\r\n",
+        "FROM workspace.scribd_exercise.metrics_mrr\r\n",
+        "WHERE month_end >= DATE'2023-01-31'"
+      ]
+    },
+    {
+      "name": "7dc06642",
+      "displayName": "title_churn",
+      "queryLines": [
+        "SELECT business_id, month, value\r\n",
+        "FROM (\r\n",
+        "  SELECT business_id,\r\n",
+        "         DATE_FORMAT(ADD_MONTHS(window_end, -k), 'yyyy-MM') AS month,\r\n",
+        "         churn_rate AS value\r\n",
+        "  FROM workspace.scribd_exercise.metrics_churn\r\n",
+        "  LATERAL VIEW EXPLODE(SEQUENCE(0, 2)) t AS k\r\n",
+        "  WHERE MONTH(window_end) IN (2, 5, 8, 11)\r\n",
+        "    AND billing_cycle = 'All billing cycles'\r\n",
+        ")\r\n",
+        "WHERE month >= '2023-01'"
+      ]
+    },
+    {
+      "name": "1ef4350a",
+      "displayName": "title_ranges",
+      "queryLines": [
+        "SELECT 'Active paid subscribers' AS metric,\r\n",
+        "       business_id,\r\n",
+        "       DATE_FORMAT(month_end, 'yyyy-MM') AS month,\r\n",
+        "       CONCAT('as of ', CAST(month_end AS STRING)) AS period,\r\n",
+        "       FORMAT_NUMBER(active_paid_subscribers, 0) AS headline,\r\n",
+        "       CONCAT('Up to ', FORMAT_NUMBER(upper_bound_paid_subscribers, 0)) AS range_or_ci\r\n",
+        "FROM workspace.scribd_exercise.metrics_active_subscribers\r\n",
+        "WHERE month_end >= DATE'2023-01-31'\r\n",
+        "\r\n",
+        "UNION ALL\r\n",
+        "\r\n",
+        "SELECT 'MRR' AS metric,\r\n",
+        "       business_id,\r\n",
+        "       DATE_FORMAT(month_end, 'yyyy-MM') AS month,\r\n",
+        "       CONCAT('as of ', CAST(month_end AS STRING)) AS period,\r\n",
+        "       CONCAT('$', FORMAT_NUMBER(mrr_usd, 2)) AS headline,\r\n",
+        "       CONCAT('Up to $', FORMAT_NUMBER(mrr_upper_bound_usd, 2)) AS range_or_ci\r\n",
+        "FROM workspace.scribd_exercise.metrics_mrr\r\n",
+        "WHERE month_end >= DATE'2023-01-31'\r\n",
+        "\r\n",
+        "UNION ALL\r\n",
+        "\r\n",
+        "SELECT metric, business_id, month, period, headline, range_or_ci\r\n",
+        "FROM (\r\n",
+        "  SELECT 'Churn rate (3 months)' AS metric,\r\n",
+        "         business_id,\r\n",
+        "         DATE_FORMAT(ADD_MONTHS(window_end, -k), 'yyyy-MM') AS month,\r\n",
+        "         CONCAT(DATE_FORMAT(window_start, 'MMM'), '–', DATE_FORMAT(window_end, 'MMM yyyy')) AS period,\r\n",
+        "         CONCAT(FORMAT_NUMBER(ROUND(CAST(churn_rate AS DECIMAL(10,4)) * 100, 1), 1), '%') AS headline,\r\n",
+        "         CONCAT('95% CI: ', FORMAT_NUMBER(ROUND(CAST(churn_rate_ci_low AS DECIMAL(10,4)) * 100, 1), 1), '% to ',\r\n",
+        "                FORMAT_NUMBER(ROUND(CAST(churn_rate_ci_high AS DECIMAL(10,4)) * 100, 1), 1), '%') AS range_or_ci\r\n",
+        "  FROM workspace.scribd_exercise.metrics_churn\r\n",
+        "  LATERAL VIEW EXPLODE(SEQUENCE(0, 2)) t AS k\r\n",
+        "  WHERE MONTH(window_end) IN (2, 5, 8, 11)\r\n",
+        "    AND billing_cycle = 'All billing cycles'\r\n",
+        ")\r\n",
+        "WHERE month >= '2023-01'"
+      ]
+    },
+    {
+      "name": "5b34a463",
+      "displayName": "content_age_by_month",
+      "queryLines": [
+        "SELECT *,\r\n",
+        "       DATE_FORMAT(month_start, 'yyyy-MM') AS month,\r\n",
+        "       CONCAT(band_order, '. ', age_band) AS age_band_label\r\n",
+        "FROM workspace.scribd_exercise.metrics_content_age\r\n",
+        "WHERE month_start >= DATE'2023-01-01'"
+      ]
+    },
+    {
+      "name": "d30c571d",
+      "displayName": "reach_by_age",
+      "queryLines": [
+        "SELECT *,\r\n",
+        "       DATE_FORMAT(month_start, 'yyyy-MM') AS month,\r\n",
+        "       CASE\r\n",
+        "         WHEN dimension_value LIKE 'New%' THEN CONCAT('1. ', dimension_value)\r\n",
+        "         WHEN dimension_value LIKE 'Recent%' THEN CONCAT('2. ', dimension_value)\r\n",
+        "         ELSE CONCAT('3. ', dimension_value)\r\n",
+        "       END AS age_band_label\r\n",
+        "FROM workspace.scribd_exercise.metrics_catalog_reach\r\n",
+        "WHERE month_start >= DATE'2023-01-01'\r\n",
+        "  AND dimension = 'content age'"
+      ]
+    },
+    {
+      "name": "7366e865",
+      "displayName": "reach_by_category",
+      "queryLines": [
+        "SELECT month_start, business_id, business_id AS category_business, dimension, dimension_value,\r\n",
+        "       live_items, reached_items, catalog_reach, catalog_reach_ci_low, catalog_reach_ci_high,\r\n",
+        "       DATE_FORMAT(month_start, 'yyyy-MM') AS month\r\n",
+        "FROM workspace.scribd_exercise.metrics_catalog_reach\r\n",
+        "WHERE month_start >= DATE'2023-01-01'\r\n",
+        "  AND dimension = 'category'\r\n",
+        "  AND business_id <> 'All businesses'\r\n",
+        "UNION ALL\r\n",
+        "SELECT month_start, 'All businesses' AS business_id, business_id AS category_business, dimension, dimension_value,\r\n",
+        "       live_items, reached_items, catalog_reach, catalog_reach_ci_low, catalog_reach_ci_high,\r\n",
+        "       DATE_FORMAT(month_start, 'yyyy-MM') AS month\r\n",
+        "FROM workspace.scribd_exercise.metrics_catalog_reach\r\n",
+        "WHERE month_start >= DATE'2023-01-01'\r\n",
+        "  AND dimension = 'category'\r\n",
+        "  AND business_id <> 'All businesses'"
+      ]
+    },
+    {
+      "name": "f376614d",
+      "displayName": "completeness",
+      "queryLines": [
+        "SELECT *,\r\n",
+        "       DATE_FORMAT(month_start, 'yyyy-MM') AS month\r\n",
+        "FROM workspace.scribd_exercise.metrics_metadata_completeness\r\n",
+        "WHERE month_start >= DATE'2023-01-01'"
+      ]
+    },
+    {
+      "name": "ac692c6b",
+      "displayName": "reach_by_age_trend",
+      "queryLines": [
+        "SELECT *,\r\n",
+        "       CASE\r\n",
+        "         WHEN dimension_value LIKE 'New%' THEN CONCAT('1. ', dimension_value)\r\n",
+        "         WHEN dimension_value LIKE 'Recent%' THEN CONCAT('2. ', dimension_value)\r\n",
+        "         ELSE CONCAT('3. ', dimension_value)\r\n",
+        "       END AS age_band_label\r\n",
+        "FROM workspace.scribd_exercise.metrics_catalog_reach\r\n",
+        "WHERE month_start >= DATE'2025-01-01'\r\n",
+        "  AND dimension = 'content age'"
+      ]
+    },
+    {
+      "name": "1a47ccd3",
+      "displayName": "Impact",
+      "queryLines": [
+        "SELECT sort_order,\r\n",
+        "       metric,\r\n",
+        "       CASE\r\n",
+        "         WHEN unit = 'USD per month' THEN CONCAT('$', FORMAT_NUMBER(raw_value, 2))\r\n",
+        "         WHEN unit IN ('users', 'people') THEN FORMAT_NUMBER(raw_value, 0)\r\n",
+        "         ELSE CONCAT(FORMAT_NUMBER(ROUND(CAST(raw_value AS DECIMAL(10,4)) * 100, 1), 1), '%')\r\n",
+        "       END AS raw,\r\n",
+        "       CASE\r\n",
+        "         WHEN unit = 'USD per month' THEN CONCAT('$', FORMAT_NUMBER(clean_value, 2))\r\n",
+        "         WHEN unit IN ('users', 'people') THEN FORMAT_NUMBER(clean_value, 0)\r\n",
+        "         ELSE CONCAT(FORMAT_NUMBER(ROUND(CAST(clean_value AS DECIMAL(10,4)) * 100, 1), 1), '%')\r\n",
+        "       END AS clean,\r\n",
+        "       pct_difference,\r\n",
+        "       impact_level,\r\n",
+        "       main_driver\r\n",
+        "FROM workspace.scribd_exercise.metrics_impact\r\n",
+        "ORDER BY sort_order"
+      ]
+    },
+    {
+      "name": "cc3eaf2e",
+      "displayName": "mrr_bridge",
+      "queryLines": [
+        "SELECT *,\r\n",
+        "       CASE step_order\r\n",
+        "         WHEN 1 THEN '1. Raw MRR'\r\n",
+        "         WHEN 2 THEN '2. Test accounts'\r\n",
+        "         WHEN 3 THEN '3. Test status'\r\n",
+        "         WHEN 4 THEN '4. Placeholder prices'\r\n",
+        "         WHEN 5 THEN '5. Overlapping subscriptions'\r\n",
+        "       END AS step_label,\r\n",
+        "       COALESCE(change_usd, mrr_after_step) AS waterfall_value\r\n",
+        "FROM workspace.scribd_exercise.metrics_mrr_bridge"
+      ]
+    },
+    {
+      "name": "c030a65b",
+      "displayName": "data_health",
+      "queryLines": [
+        "SELECT table_name,\r\n",
+        "       raw_rows,\r\n",
+        "       clean_rows,\r\n",
+        "       flagged_rows,\r\n",
+        "       quarantined_rows,\r\n",
+        "       pct_flagged / 100 AS pct_flagged,\r\n",
+        "       pct_quarantined / 100 AS pct_quarantined,\r\n",
+        "       reconciliation\r\n",
+        "FROM workspace.scribd_exercise.metrics_data_health"
+      ]
+    },
+    {
+      "name": "466865aa",
+      "displayName": "data_health_reasons",
+      "queryLines": [
+        "SELECT * FROM workspace.scribd_exercise.metrics_data_health_reasons"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "054ccfaf",
+      "displayName": "Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "business",
+            "queries": [
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dddea51013c4a2272b08101321b2_business_id",
+                "query": {
+                  "datasetName": "a5ac6f73",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dddeb0321263996dca1cedd3ac73_business_id",
+                "query": {
+                  "datasetName": "3531849e",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dddebb831e0d8dcd04caa6f2a4e4_business_id",
+                "query": {
+                  "datasetName": "f3d334b4",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dddec39114509b143149379b340f_business_id",
+                "query": {
+                  "datasetName": "bb76b21b",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde33bd6140696df4d775d729a3d_business_id",
+                "query": {
+                  "datasetName": "4222dd6c",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3484e1b8ba7e676dfc531fad7_business_id",
+                "query": {
+                  "datasetName": "2f9b64f0",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3596f1bf6850c1ff9fb75fb54_business_id",
+                "query": {
+                  "datasetName": "d3bd0016",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3642816d8a60cdf7d95b9bd1e_business_id",
+                "query": {
+                  "datasetName": "7dc06642",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde371d5123b9f291afb630c32a2_business_id",
+                "query": {
+                  "datasetName": "1ef4350a",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "All businesses"
+                      }
+                    ]
+                  }
+                }
+              },
+              "disallowAll": true,
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": {
+                  "value": "Business",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dddea51013c4a2272b08101321b2_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dddeb0321263996dca1cedd3ac73_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dddebb831e0d8dcd04caa6f2a4e4_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dddec39114509b143149379b340f_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde33bd6140696df4d775d729a3d_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3484e1b8ba7e676dfc531fad7_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3596f1bf6850c1ff9fb75fb54_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3642816d8a60cdf7d95b9bd1e_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde371d5123b9f291afb630c32a2_business_id"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "monthly-active-users",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a5ac6f73",
+                  "fields": [
+                    {
+                      "name": "monthly(month_start)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `month_start`)"
+                    },
+                    {
+                      "name": "sum(mau)",
+                      "expression": "SUM(`mau`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": {
+                  "value": "Monthly Active Users",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(month_start)",
+                  "displayName": "Month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(mau)",
+                  "displayName": "MAU",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "active-paid-subscribers-month-end",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "3531849e",
+                  "fields": [
+                    {
+                      "name": "monthly(month_end)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `month_end`)"
+                    },
+                    {
+                      "name": "sum(active_paid_subscribers)",
+                      "expression": "SUM(`active_paid_subscribers`)"
+                    },
+                    {
+                      "name": "sum(upper_bound_paid_subscribers)",
+                      "expression": "SUM(`upper_bound_paid_subscribers`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Active Paid Subscribers (month end)",
+                  "fields": []
+                },
+                "description": {
+                  "value": "The gray line is the most it could be if paid subscriptions with an unreliable status (test status, stale trials) are active. The true count is between the two lines.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  null,
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  }
+                ],
+                "lineShape": "linear"
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(month_end)",
+                  "displayName": "Month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(active_paid_subscribers)",
+                      "displayName": "Headline"
+                    },
+                    {
+                      "fieldName": "sum(upper_bound_paid_subscribers)",
+                      "displayName": "Upper bound"
+                    }
+                  ]
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "mrr-usd-total-lifetime-deals",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f3d334b4",
+                  "fields": [
+                    {
+                      "name": "monthly(month_end)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `month_end`)"
+                    },
+                    {
+                      "name": "sum(mrr_usd)",
+                      "expression": "SUM(`mrr_usd`)"
+                    },
+                    {
+                      "name": "sum(mrr_lifetime_usd)",
+                      "expression": "SUM(`mrr_lifetime_usd`)"
+                    },
+                    {
+                      "name": "sum(mrr_upper_bound_usd)",
+                      "expression": "SUM(`mrr_upper_bound_usd`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "MRR (USD), total and lifetime deals",
+                  "fields": []
+                },
+                "description": {
+                  "value": "The gray line is the most it could be if paid subscriptions with an unreliable status (test status, stale trials) are active and paying. The true MRR is between the two lines. The lifetime-deals line shows how much of MRR comes from lifetime deals.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "colors": [
+                  null,
+                  null,
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  }
+                ]
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(month_end)",
+                  "displayName": "Month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(mrr_usd)",
+                      "displayName": "MRR"
+                    },
+                    {
+                      "fieldName": "sum(mrr_lifetime_usd)",
+                      "displayName": "From lifetime deals"
+                    },
+                    {
+                      "fieldName": "sum(mrr_upper_bound_usd)",
+                      "displayName": "Upper bound"
+                    }
+                  ]
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "churn-rate-trailing-3-months",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "bb76b21b",
+                  "fields": [
+                    {
+                      "name": "billing_cycle",
+                      "expression": "`billing_cycle`"
+                    },
+                    {
+                      "name": "window_label",
+                      "expression": "`window_label`"
+                    },
+                    {
+                      "name": "sum(churn_rate)",
+                      "expression": "SUM(`churn_rate`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Churn rate by 3-month window",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Each point is a separate 3-month window (e.g., Jun-Aug 2026); windows don't overlap, so any two points can be compared. Starts in 2025; earlier windows have too few customers for a stable rate.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "window_label",
+                  "axis": {
+                    "labelAngle": 0
+                  },
+                  "displayName": "3-month window",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "natural-order"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(churn_rate)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "Churn Rate",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "billing_cycle",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 26,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "779248cd",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "**Data through August 2026.** Tables stop in mid-September, so later months would show false drops. Test accounts are removed. Placeholder prices are replaced with the plan's price from the price grid. Subscriptions with an unreliable status (test status, stale trials) are left out of the headline numbers but included in the upper end of each range. Churn is a 3-month rate, not monthly. See the Data trust page for how cleaning changed each number."
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "d5e473d0",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "**Analysis findings (as of August 2026; full analysis in notebook 04)**\n",
+                    "\n",
+                    "- Churn differs by billing cycle: monthly 27.2% vs. lifetime 4.8% over June–August (Fisher p < 0.001). This is an association, not evidence that lifetime deals cause retention.\n",
+                    "- Churn does not differ reliably across businesses: BIZ\\_1 15.7%, BIZ\\_2 13.0%, BIZ\\_3 11.1% (chi-square p = 0.66).\n",
+                    "- Older content is much less likely to be reached: 66% vs. 97% for content under a year old (Fisher p < 0.001)"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 32,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "18236607",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "4222dd6c",
+                  "fields": [
+                    {
+                      "name": "sum(value)",
+                      "expression": "SUM(`value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "MAU (Selected Month)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(value)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "active-paid-subscribers-aug-31-2026",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "2f9b64f0",
+                  "fields": [
+                    {
+                      "name": "sum(value)",
+                      "expression": "SUM(`value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Active Paid Subscribers (month end)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(value)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "mrr-aug-31-2026",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d3bd0016",
+                  "fields": [
+                    {
+                      "name": "sum(value)",
+                      "expression": "SUM(`value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "MRR (Aug 31, 2026)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(value)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 3,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "churn-rate-3-months-jun-aug-2026",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "7dc06642",
+                  "fields": [
+                    {
+                      "name": "sum(value)",
+                      "expression": "SUM(`value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "**Churn rate, 3-month window containing the selected month**",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(value)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 3,
+            "width": 3,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "ranges-confidence-intervals",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "1ef4350a",
+                  "fields": [
+                    {
+                      "name": "metric",
+                      "expression": "`metric`"
+                    },
+                    {
+                      "name": "period",
+                      "expression": "`period`"
+                    },
+                    {
+                      "name": "headline",
+                      "expression": "`headline`"
+                    },
+                    {
+                      "name": "range_or_ci",
+                      "expression": "`range_or_ci`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Ranges and confidence intervals",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "metric"
+                  },
+                  {
+                    "fieldName": "period"
+                  },
+                  {
+                    "fieldName": "headline"
+                  },
+                  {
+                    "fieldName": "range_or_ci"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "month1",
+            "queries": [
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde33bd6140696df4d775d729a3d_month",
+                "query": {
+                  "datasetName": "4222dd6c",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3484e1b8ba7e676dfc531fad7_month",
+                "query": {
+                  "datasetName": "2f9b64f0",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3596f1bf6850c1ff9fb75fb54_month",
+                "query": {
+                  "datasetName": "d3bd0016",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3642816d8a60cdf7d95b9bd1e_month",
+                "query": {
+                  "datasetName": "7dc06642",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde371d5123b9f291afb630c32a2_month",
+                "query": {
+                  "datasetName": "1ef4350a",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "disallowAll": true,
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "2026-08"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Month",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde33bd6140696df4d775d729a3d_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3484e1b8ba7e676dfc531fad7_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3596f1bf6850c1ff9fb75fb54_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde3642816d8a60cdf7d95b9bd1e_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1dde371d5123b9f291afb630c32a2_month"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "26b9d342",
+      "displayName": "Content",
+      "layout": [
+        {
+          "widget": {
+            "name": "month",
+            "queries": [
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0e86c21d37b9ab925b42cbb7a7_month",
+                "query": {
+                  "datasetName": "5b34a463",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0e952e1deb9fc6704519f42df0_month",
+                "query": {
+                  "datasetName": "d30c571d",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0ea20f18dcae258b68af330dad_month",
+                "query": {
+                  "datasetName": "7366e865",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0ebb3b1f15a34b712867122b90_month",
+                "query": {
+                  "datasetName": "f376614d",
+                  "fields": [
+                    {
+                      "name": "month",
+                      "expression": "`month`"
+                    },
+                    {
+                      "name": "month_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "2026-08"
+                      }
+                    ]
+                  }
+                }
+              },
+              "disallowAll": true,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Month",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0e86c21d37b9ab925b42cbb7a7_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0e952e1deb9fc6704519f42df0_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0ea20f18dcae258b68af330dad_month"
+                  },
+                  {
+                    "fieldName": "month",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0ebb3b1f15a34b712867122b90_month"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "engagement-share-vs-catalog-share-content-age",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "5b34a463",
+                  "fields": [
+                    {
+                      "name": "age_band_label",
+                      "expression": "`age_band_label`"
+                    },
+                    {
+                      "name": "sum(engagement_share)",
+                      "expression": "SUM(`engagement_share`)"
+                    },
+                    {
+                      "name": "sum(catalog_share)",
+                      "expression": "SUM(`catalog_share`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Engagement share vs. catalog share by content age",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Share of content events (engagement) vs. share of live items (catalog) for each content age band. In August 2026, new content (0–90 days) was 7.7% of the catalog but got 29.2% of engagement; older content was 70% of the catalog and got 38%.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "mark": {
+                "layout": "group"
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "age_band_label",
+                  "displayName": "Content age",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(engagement_share)",
+                      "displayName": "Share of engagement"
+                    },
+                    {
+                      "fieldName": "sum(catalog_share)",
+                      "displayName": "Share of catalog"
+                    }
+                  ],
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "catalog-reach-by-category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "7366e865",
+                  "fields": [
+                    {
+                      "name": "category_business",
+                      "expression": "`category_business`"
+                    },
+                    {
+                      "name": "sum(catalog_reach_ci_low)",
+                      "expression": "SUM(`catalog_reach_ci_low`)"
+                    },
+                    {
+                      "name": "sum(catalog_reach_ci_high)",
+                      "expression": "SUM(`catalog_reach_ci_high`)"
+                    },
+                    {
+                      "name": "dimension_value",
+                      "expression": "`dimension_value`"
+                    },
+                    {
+                      "name": "sum(catalog_reach)",
+                      "expression": "SUM(`catalog_reach`)"
+                    },
+                    {
+                      "name": "approx_percentile(catalog_reach_ci_high, percentage=0_75)",
+                      "expression": "APPROX_PERCENTILE(`catalog_reach_ci_high`, 0.75)"
+                    },
+                    {
+                      "name": "approx_percentile(catalog_reach_ci_low, percentage=0_25)",
+                      "expression": "APPROX_PERCENTILE(`catalog_reach_ci_low`, 0.25)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Catalog reach by category",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Share of live items in each category with at least one content event from a regular user in the month. Categories have 10–29 items each, so one item more or less moves a category's reach by several points.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dimension_value",
+                  "displayName": "Category",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(catalog_reach)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Catalog reach",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "error": {
+                    "type": "absolute",
+                    "upper": {
+                      "fieldName": "approx_percentile(catalog_reach_ci_high, percentage=0_75)"
+                    },
+                    "lower": {
+                      "fieldName": "approx_percentile(catalog_reach_ci_low, percentage=0_25)"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "category_business",
+                  "displayName": "Business Category",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "sum(catalog_reach_ci_low)",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "sum(catalog_reach_ci_high)",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 7,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "metadata-completeness",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "f376614d",
+                  "fields": [
+                    {
+                      "name": "requirement",
+                      "expression": "`requirement`"
+                    },
+                    {
+                      "name": "pass_rate",
+                      "expression": "`pass_rate`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Metadata Completeness",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Share of live items that pass each metadata requirement. \"All requirements\" is the share that passes every one. In August 2026, the only failing requirement is runtime: 10 items have placeholder runtimes (-1 or 99999).",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "requirement"
+                  },
+                  {
+                    "fieldName": "pass_rate",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "hideGroupSeparator": true
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 19,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "business",
+            "queries": [
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0e86c21d37b9ab925b42cbb7a7_business_id",
+                "query": {
+                  "datasetName": "5b34a463",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0e952e1deb9fc6704519f42df0_business_id",
+                "query": {
+                  "datasetName": "d30c571d",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0ea20f18dcae258b68af330dad_business_id",
+                "query": {
+                  "datasetName": "7366e865",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0ebb3b1f15a34b712867122b90_business_id",
+                "query": {
+                  "datasetName": "f376614d",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de183f8f1b60911cf36626cb1ebc_business_id",
+                "query": {
+                  "datasetName": "ac692c6b",
+                  "fields": [
+                    {
+                      "name": "business_id",
+                      "expression": "`business_id`"
+                    },
+                    {
+                      "name": "business_id_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "All businesses"
+                      }
+                    ]
+                  }
+                }
+              },
+              "disallowAll": true,
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Business",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0e86c21d37b9ab925b42cbb7a7_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0e952e1deb9fc6704519f42df0_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0ea20f18dcae258b68af330dad_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de0ebb3b1f15a34b712867122b90_business_id"
+                  },
+                  {
+                    "fieldName": "business_id",
+                    "queryName": "dashboards/01f1dddd74231954a9b8e5873d8ba836/datasets/01f1de183f8f1b60911cf36626cb1ebc_business_id"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "catalog-reach-content-age-over-time",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ac692c6b",
+                  "fields": [
+                    {
+                      "name": "age_band_label",
+                      "expression": "`age_band_label`"
+                    },
+                    {
+                      "name": "sum(catalog_reach_ci_low)",
+                      "expression": "SUM(`catalog_reach_ci_low`)"
+                    },
+                    {
+                      "name": "sum(catalog_reach_ci_high)",
+                      "expression": "SUM(`catalog_reach_ci_high`)"
+                    },
+                    {
+                      "name": "monthly(month_start)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `month_start`)"
+                    },
+                    {
+                      "name": "sum(catalog_reach)",
+                      "expression": "SUM(`catalog_reach`)"
+                    },
+                    {
+                      "name": "approx_percentile(catalog_reach_ci_high, percentage=0_75)",
+                      "expression": "APPROX_PERCENTILE(`catalog_reach_ci_high`, 0.75)"
+                    },
+                    {
+                      "name": "approx_percentile(catalog_reach_ci_low, percentage=0_25)",
+                      "expression": "APPROX_PERCENTILE(`catalog_reach_ci_low`, 0.25)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Catalog reach by content age over time",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Share of live items in each age band with at least one content event from a regular user in the month. All bands rise as active users grow, so focus on the gap between the lines: a persistent gap means older content is consistently less discovered. Starts in 2025; earlier months have too few new items for a stable rate.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(month_start)",
+                  "displayName": "Month",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(catalog_reach)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 1
+                    }
+                  },
+                  "displayName": "Catalog reach",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "error": {
+                    "type": "absolute",
+                    "upper": {
+                      "fieldName": "approx_percentile(catalog_reach_ci_high, percentage=0_75)"
+                    },
+                    "lower": {
+                      "fieldName": "approx_percentile(catalog_reach_ci_low, percentage=0_25)"
+                    }
+                  }
+                },
+                "color": {
+                  "fieldName": "age_band_label",
+                  "displayName": "Content age",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "extra": [
+                  {
+                    "fieldName": "sum(catalog_reach_ci_low)",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  },
+                  {
+                    "fieldName": "sum(catalog_reach_ci_high)",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "max",
+                        "places": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 13,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "f50a806c",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "**Analysis findings (as of August 2026; full analysis in notebook 04)**\n",
+                    "\n",
+                    "- New content punches above its weight: content under 90 days old is 7.7% of the catalog but gets 29.2% of engagement (8.0 events per item vs. 1.2 for older content).\n",
+                    "- Older content is much less likely to be discovered: 66% of older items were reached vs. 97% of items under a year old (Fisher p < 0.001), and older items make up 67 of the 70 items nobody engaged with.\n",
+                    "- BIZ\\_1's lower reach is largely a mix effect: its catalog is mostly older content (3.8% new vs. 15.8% for BIZ\\_3). This is an association; the data can't separate category from business.\n",
+                    "- Metadata is 96.5% complete; the only failing requirement is runtime (10 items with placeholder values)."
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 25,
+            "width": 12,
+            "height": 5
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "c481e58b",
+      "displayName": "Global Filters",
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "2197523d",
+      "displayName": "Data Trust",
+      "layout": [
+        {
+          "widget": {
+            "name": "24b1bf76",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "**How cleaning changed the numbers (August 2026, company-wide).** This page is a fixed snapshot for the reporting month and isn't affected by filters on other pages. Each headline metric was computed twice with the same definition: once straight from the raw tables and once from the clean layer. Impact level: High = 20%+ difference, Medium = 5–20%, Low = under 5% (a judgment call). Issue numbers refer to issue\\_log.md in the repo."
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "impact-of-cleaning-on-headline-metrics",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "1a47ccd3",
+                  "fields": [
+                    {
+                      "name": "metric",
+                      "expression": "`metric`"
+                    },
+                    {
+                      "name": "raw",
+                      "expression": "`raw`"
+                    },
+                    {
+                      "name": "clean",
+                      "expression": "`clean`"
+                    },
+                    {
+                      "name": "pct_difference",
+                      "expression": "`pct_difference`"
+                    },
+                    {
+                      "name": "impact_level",
+                      "expression": "`impact_level`"
+                    },
+                    {
+                      "name": "main_driver",
+                      "expression": "`main_driver`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Impact of cleaning on headline metrics",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "metric",
+                    "displayName": "Metric"
+                  },
+                  {
+                    "fieldName": "raw",
+                    "displayName": "Raw"
+                  },
+                  {
+                    "fieldName": "clean",
+                    "displayName": "Clean"
+                  },
+                  {
+                    "fieldName": "pct_difference",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "hideGroupSeparator": true
+                    },
+                    "displayName": "Difference (raw vs. clean)"
+                  },
+                  {
+                    "fieldName": "impact_level",
+                    "displayName": "Impact"
+                  },
+                  {
+                    "fieldName": "main_driver",
+                    "displayName": "Main Driver"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "mrr-from-raw-to-clean-aug-31-2026",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "cc3eaf2e",
+                  "fields": [
+                    {
+                      "name": "step_label",
+                      "expression": "`step_label`"
+                    },
+                    {
+                      "name": "sum(waterfall_value)",
+                      "expression": "SUM(`waterfall_value`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "MRR from raw to clean (Aug 31, 2026)",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Raw MRR is $9,245.77; clean MRR is $3,956.01. Placeholder prices of $999.99 (step 4) explain 90% of the gap. The step order is a choice; a different order splits the amounts slightly differently, but the total is the same.",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "total": {
+                "hide": false,
+                "displayValue": "Clean MRR",
+                "color": {
+                  "themeColorType": "visualizationColors",
+                  "position": 3
+                }
+              },
+              "widgetType": "waterfall",
+              "encodings": {
+                "x": {
+                  "fieldName": "step_label",
+                  "displayName": "Step",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(waterfall_value)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "displayName": "MRR (USD)",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 8,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "rows-kept-flagged-quarantined-by-table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "c030a65b",
+                  "fields": [
+                    {
+                      "name": "table_name",
+                      "expression": "`table_name`"
+                    },
+                    {
+                      "name": "raw_rows",
+                      "expression": "`raw_rows`"
+                    },
+                    {
+                      "name": "clean_rows",
+                      "expression": "`clean_rows`"
+                    },
+                    {
+                      "name": "flagged_rows",
+                      "expression": "`flagged_rows`"
+                    },
+                    {
+                      "name": "quarantined_rows",
+                      "expression": "`quarantined_rows`"
+                    },
+                    {
+                      "name": "pct_flagged",
+                      "expression": "`pct_flagged`"
+                    },
+                    {
+                      "name": "pct_quarantined",
+                      "expression": "`pct_quarantined`"
+                    },
+                    {
+                      "name": "reconciliation",
+                      "expression": "`reconciliation`"
+                    }
+                  ],
+                  "disaggregated": true,
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`quarantined_rows`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showDescription": true,
+                "showTitle": true,
+                "title": {
+                  "value": "Rows kept, flagged and quarantined by table",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Every raw row ends up in exactly one place: the clean layer (kept, possibly flagged) or quarantine (excluded, with a reason). Counts cover each whole table, not one month.",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "table_name",
+                    "displayName": "Table"
+                  },
+                  {
+                    "fieldName": "raw_rows",
+                    "displayName": "Raw rows"
+                  },
+                  {
+                    "fieldName": "clean_rows",
+                    "displayName": "Clean rows"
+                  },
+                  {
+                    "fieldName": "flagged_rows",
+                    "displayName": "Flagged rows"
+                  },
+                  {
+                    "fieldName": "quarantined_rows",
+                    "displayName": "Quarantined rows"
+                  },
+                  {
+                    "fieldName": "pct_flagged",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "significantFigures": {
+                        "type": "all"
+                      },
+                      "hideGroupSeparator": true
+                    },
+                    "displayName": "% flagged"
+                  },
+                  {
+                    "fieldName": "pct_quarantined",
+                    "format": {
+                      "type": "number-percent",
+                      "decimalPlaces": {
+                        "type": "exact",
+                        "places": 1
+                      },
+                      "hideGroupSeparator": true
+                    },
+                    "displayName": "% quarantined"
+                  },
+                  {
+                    "fieldName": "reconciliation",
+                    "displayName": "Reconciliation"
+                  }
+                ],
+                "rowOrder": [
+                  {
+                    "by": "column",
+                    "field": {
+                      "index": 4
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 14,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "quarantine-flag-reasons",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "466865aa",
+                  "fields": [
+                    {
+                      "name": "table_name",
+                      "expression": "`table_name`"
+                    },
+                    {
+                      "name": "kind",
+                      "expression": "`kind`"
+                    },
+                    {
+                      "name": "reason",
+                      "expression": "`reason`"
+                    },
+                    {
+                      "name": "rows",
+                      "expression": "`rows`"
+                    }
+                  ],
+                  "disaggregated": true,
+                  "orders": [
+                    {
+                      "direction": "DESC",
+                      "expression": "`rows`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "title": {
+                  "value": "Quarantine and flag reasons\t",
+                  "fields": []
+                },
+                "description": {
+                  "value": "Why rows were quarantined or flagged, by table. Quarantined rows are excluded from all metrics; flagged rows are kept and can be filtered.",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "table_name",
+                    "displayName": "Table"
+                  },
+                  {
+                    "fieldName": "kind",
+                    "displayName": "Kind"
+                  },
+                  {
+                    "fieldName": "reason",
+                    "displayName": "Reason"
+                  },
+                  {
+                    "fieldName": "rows",
+                    "displayName": "Rows"
+                  }
+                ],
+                "rowOrder": [
+                  {
+                    "by": "column-reversed",
+                    "field": {
+                      "index": 3
+                    }
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 12,
+            "height": 16
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}
