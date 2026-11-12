@@ -115,7 +115,7 @@
         "         DATE_FORMAT(ADD_MONTHS(window_end, -k), 'yyyy-MM') AS month,\r\n",
         "         CONCAT(DATE_FORMAT(window_start, 'MMM'), '–', DATE_FORMAT(window_end, 'MMM yyyy')) AS period,\r\n",
         "         CONCAT(FORMAT_NUMBER(ROUND(CAST(churn_rate AS DECIMAL(10,4)) * 100, 1), 1), '%') AS headline,\r\n",
-        "         CONCAT('95% CI: ', FORMAT_NUMBER(ROUND(CAST(churn_rate_ci_low AS DECIMAL(10,4)) * 100, 1), 1), '% to ',\r\n",
+        "         CONCAT('Likely between: ', FORMAT_NUMBER(ROUND(CAST(churn_rate_ci_low AS DECIMAL(10,4)) * 100, 1), 1), '% and ',\r\n",
         "                FORMAT_NUMBER(ROUND(CAST(churn_rate_ci_high AS DECIMAL(10,4)) * 100, 1), 1), '%') AS range_or_ci\r\n",
         "  FROM workspace.scribd_exercise.metrics_churn\r\n",
         "  LATERAL VIEW EXPLODE(SEQUENCE(0, 2)) t AS k\r\n",
@@ -523,7 +523,7 @@
                 "showTitle": true,
                 "showDescription": false,
                 "title": {
-                  "value": "Monthly Active Users",
+                  "value": "How many people use the product each month? (MAU)",
                   "fields": []
                 }
               },
@@ -552,7 +552,7 @@
           },
           "position": {
             "x": 0,
-            "y": 8,
+            "y": 11,
             "width": 12,
             "height": 6
           }
@@ -575,8 +575,8 @@
                       "expression": "SUM(`active_paid_subscribers`)"
                     },
                     {
-                      "name": "sum(upper_bound_paid_subscribers)",
-                      "expression": "SUM(`upper_bound_paid_subscribers`)"
+                      "name": "approx_percentile(upper_bound_paid_subscribers, percentage=0_75)",
+                      "expression": "APPROX_PERCENTILE(`upper_bound_paid_subscribers`, 0.75)"
                     }
                   ],
                   "disaggregated": false
@@ -588,22 +588,18 @@
                 "showTitle": true,
                 "showDescription": true,
                 "title": {
-                  "value": "Active Paid Subscribers (month end)",
+                  "value": "How many paying subscribers do we have at the end of the month? (Active Paid Subscribers)",
                   "fields": []
                 },
                 "description": {
-                  "value": "The gray line is the most it could be if paid subscriptions with an unreliable status (test status, stale trials) are active. The true count is between the two lines.",
+                  "value": "The shaded band is the most it could be if paid subscriptions with an unreliable status (test status, stale trials) are active. The true count is between the two lines.",
                   "fields": []
                 }
               },
               "version": 3,
               "mark": {
                 "colors": [
-                  null,
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 9
-                  }
+                  null
                 ],
                 "lineShape": "linear"
               },
@@ -617,19 +613,17 @@
                   }
                 },
                 "y": {
+                  "fieldName": "sum(active_paid_subscribers)",
+                  "displayName": "Value",
                   "scale": {
                     "type": "quantitative"
                   },
-                  "fields": [
-                    {
-                      "fieldName": "sum(active_paid_subscribers)",
-                      "displayName": "Headline"
-                    },
-                    {
-                      "fieldName": "sum(upper_bound_paid_subscribers)",
-                      "displayName": "Upper bound"
+                  "error": {
+                    "type": "absolute",
+                    "upper": {
+                      "fieldName": "approx_percentile(upper_bound_paid_subscribers, percentage=0_75)"
                     }
-                  ]
+                  }
                 }
               },
               "data": {
@@ -639,7 +633,7 @@
           },
           "position": {
             "x": 0,
-            "y": 14,
+            "y": 17,
             "width": 12,
             "height": 6
           }
@@ -662,12 +656,12 @@
                       "expression": "SUM(`mrr_usd`)"
                     },
                     {
-                      "name": "sum(mrr_lifetime_usd)",
-                      "expression": "SUM(`mrr_lifetime_usd`)"
+                      "name": "approx_percentile(mrr_upper_bound_usd, percentage=0_75)",
+                      "expression": "APPROX_PERCENTILE(`mrr_upper_bound_usd`, 0.75)"
                     },
                     {
-                      "name": "sum(mrr_upper_bound_usd)",
-                      "expression": "SUM(`mrr_upper_bound_usd`)"
+                      "name": "sum(mrr_lifetime_usd)",
+                      "expression": "SUM(`mrr_lifetime_usd`)"
                     }
                   ],
                   "disaggregated": false
@@ -679,11 +673,11 @@
                 "showTitle": true,
                 "showDescription": true,
                 "title": {
-                  "value": "MRR (USD), total and lifetime deals",
+                  "value": "How much recurring revenue do we have? (MRR (USD), total and lifetime deals)",
                   "fields": []
                 },
                 "description": {
-                  "value": "The gray line is the most it could be if paid subscriptions with an unreliable status (test status, stale trials) are active and paying. The true MRR is between the two lines. The lifetime-deals line shows how much of MRR comes from lifetime deals.",
+                  "value": "The shaded band is the most it could be if paid subscriptions with an unreliable status (test status, stale trials) are active and paying. The true MRR is between the two lines. The lifetime-deals line shows how much of MRR comes from lifetime deals.",
                   "fields": []
                 }
               },
@@ -691,11 +685,7 @@
               "mark": {
                 "colors": [
                   null,
-                  null,
-                  {
-                    "themeColorType": "visualizationColors",
-                    "position": 9
-                  }
+                  null
                 ]
               },
               "widgetType": "line",
@@ -714,15 +704,17 @@
                   "fields": [
                     {
                       "fieldName": "sum(mrr_usd)",
-                      "displayName": "MRR"
+                      "displayName": "MRR",
+                      "error": {
+                        "type": "absolute",
+                        "upper": {
+                          "fieldName": "approx_percentile(mrr_upper_bound_usd, percentage=0_75)"
+                        }
+                      }
                     },
                     {
                       "fieldName": "sum(mrr_lifetime_usd)",
                       "displayName": "From lifetime deals"
-                    },
-                    {
-                      "fieldName": "sum(mrr_upper_bound_usd)",
-                      "displayName": "Upper bound"
                     }
                   ]
                 }
@@ -734,7 +726,7 @@
           },
           "position": {
             "x": 0,
-            "y": 20,
+            "y": 23,
             "width": 12,
             "height": 6
           }
@@ -759,6 +751,14 @@
                     {
                       "name": "sum(churn_rate)",
                       "expression": "SUM(`churn_rate`)"
+                    },
+                    {
+                      "name": "approx_percentile(churn_rate_ci_high, percentage=0_75)",
+                      "expression": "APPROX_PERCENTILE(`churn_rate_ci_high`, 0.75)"
+                    },
+                    {
+                      "name": "approx_percentile(churn_rate_ci_low, percentage=0_25)",
+                      "expression": "APPROX_PERCENTILE(`churn_rate_ci_low`, 0.25)"
                     }
                   ],
                   "disaggregated": false
@@ -770,11 +770,11 @@
                 "showTitle": true,
                 "showDescription": true,
                 "title": {
-                  "value": "Churn rate by 3-month window",
+                  "value": "Which billing plan loses the most customers? (Churn rate by 3-month window)",
                   "fields": []
                 },
                 "description": {
-                  "value": "Each point is a separate 3-month window (e.g., Jun-Aug 2026); windows don't overlap, so any two points can be compared. Starts in 2025; earlier windows have too few customers for a stable rate.",
+                  "value": "Each point is a separate 3-month window (e.g., Jun-Aug 2026); windows don't overlap, so any two points can be compared. Starts in 2025; earlier windows have too few customers for a stable rate.\n\n<span style=\"color:#BF7080\">The shaded band shows where the true value likely falls; when they overlap, the difference may be chance.</span>",
                   "fields": []
                 }
               },
@@ -806,12 +806,51 @@
                   "displayName": "Churn Rate",
                   "scale": {
                     "type": "quantitative"
+                  },
+                  "error": {
+                    "type": "absolute",
+                    "upper": {
+                      "fieldName": "approx_percentile(churn_rate_ci_high, percentage=0_75)"
+                    },
+                    "lower": {
+                      "fieldName": "approx_percentile(churn_rate_ci_low, percentage=0_25)"
+                    }
                   }
                 },
                 "color": {
                   "fieldName": "billing_cycle",
                   "scale": {
-                    "type": "categorical"
+                    "type": "categorical",
+                    "mappings": [
+                      {
+                        "value": "monthly",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 4
+                        }
+                      },
+                      {
+                        "value": "lifetime_deal_fake",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 3
+                        }
+                      },
+                      {
+                        "value": "annual",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 2
+                        }
+                      },
+                      {
+                        "value": "All billing cycles",
+                        "color": {
+                          "themeColorType": "visualizationColors",
+                          "position": 9
+                        }
+                      }
+                    ]
                   }
                 },
                 "label": {
@@ -825,9 +864,9 @@
           },
           "position": {
             "x": 0,
-            "y": 26,
+            "y": 29,
             "width": 12,
-            "height": 6
+            "height": 8
           }
         },
         {
@@ -848,7 +887,7 @@
           },
           "position": {
             "x": 0,
-            "y": 1,
+            "y": 4,
             "width": 12,
             "height": 2
           }
@@ -875,9 +914,9 @@
           },
           "position": {
             "x": 0,
-            "y": 32,
+            "y": 37,
             "width": 12,
-            "height": 2
+            "height": 3
           }
         },
         {
@@ -920,7 +959,7 @@
           },
           "position": {
             "x": 0,
-            "y": 3,
+            "y": 6,
             "width": 3,
             "height": 2
           }
@@ -965,7 +1004,7 @@
           },
           "position": {
             "x": 3,
-            "y": 3,
+            "y": 6,
             "width": 3,
             "height": 2
           }
@@ -1019,7 +1058,7 @@
           },
           "position": {
             "x": 6,
-            "y": 3,
+            "y": 6,
             "width": 3,
             "height": 2
           }
@@ -1071,7 +1110,7 @@
           },
           "position": {
             "x": 9,
-            "y": 3,
+            "y": 6,
             "width": 3,
             "height": 2
           }
@@ -1119,16 +1158,20 @@
               "encodings": {
                 "columns": [
                   {
-                    "fieldName": "metric"
+                    "fieldName": "metric",
+                    "displayName": "Metric"
                   },
                   {
-                    "fieldName": "period"
+                    "fieldName": "period",
+                    "displayName": "Period"
                   },
                   {
-                    "fieldName": "headline"
+                    "fieldName": "headline",
+                    "displayName": "Value"
                   },
                   {
-                    "fieldName": "range_or_ci"
+                    "fieldName": "range_or_ci",
+                    "displayName": "Possible range"
                   }
                 ]
               },
@@ -1139,7 +1182,7 @@
           },
           "position": {
             "x": 0,
-            "y": 5,
+            "y": 8,
             "width": 12,
             "height": 3
           }
@@ -1288,6 +1331,35 @@
             "y": 0,
             "width": 4,
             "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "c79a1542",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "**How to read this page.**\n",
+                    "\n",
+                    "- MAU = people who used the product in the month.\n",
+                    "- Active paid subscribers = paying subscribers.\n",
+                    "- MRR = monthly recurring revenue at listed prices.\n",
+                    "- Churn = share of paying customers lost over 3 months.\n",
+                    "- \"Up to\" numbers and shaded ranges show where the true value could be when some data is uncertain."
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 3
           }
         }
       ],
@@ -1454,7 +1526,7 @@
                 "showTitle": true,
                 "showDescription": true,
                 "title": {
-                  "value": "Engagement share vs. catalog share by content age",
+                  "value": "How much of the activity goes to new vs. older content? (Engagement share vs. catalog share by content age",
                   "fields": []
                 },
                 "description": {
@@ -1557,11 +1629,11 @@
                 "showTitle": true,
                 "showDescription": true,
                 "title": {
-                  "value": "Catalog reach by category",
+                  "value": "Which categories are seen least? (Catalog reach by category)",
                   "fields": []
                 },
                 "description": {
-                  "value": "Share of live items in each category with at least one content event from a regular user in the month. Categories have 10–29 items each, so one item more or less moves a category's reach by several points.",
+                  "value": "Share of live items in each category with at least one content event from a regular user in the month. Categories have 10–29 items each, so one item more or less moves a category's reach by several points.\n\n<span style=\"color: #BF7080;\">The thin lines show where the true value likely falls; when they overlap, the difference may be chance.</span>",
                   "fields": []
                 }
               },
@@ -1640,7 +1712,7 @@
             "x": 0,
             "y": 7,
             "width": 12,
-            "height": 6
+            "height": 8
           }
         },
         {
@@ -1661,7 +1733,13 @@
                       "expression": "`pass_rate`"
                     }
                   ],
-                  "disaggregated": true
+                  "disaggregated": true,
+                  "orders": [
+                    {
+                      "direction": "ASC",
+                      "expression": "`requirement`"
+                    }
+                  ]
                 }
               }
             ],
@@ -1670,7 +1748,7 @@
                 "showTitle": true,
                 "showDescription": true,
                 "title": {
-                  "value": "Metadata Completeness",
+                  "value": "How complete is our catalog information? (Metadata Completeness)",
                   "fields": []
                 },
                 "description": {
@@ -1683,7 +1761,8 @@
               "encodings": {
                 "columns": [
                   {
-                    "fieldName": "requirement"
+                    "fieldName": "requirement",
+                    "displayName": "Requirement"
                   },
                   {
                     "fieldName": "pass_rate",
@@ -1694,6 +1773,15 @@
                         "places": 1
                       },
                       "hideGroupSeparator": true
+                    },
+                    "displayName": "Items passing"
+                  }
+                ],
+                "rowOrder": [
+                  {
+                    "by": "column",
+                    "field": {
+                      "index": 0
                     }
                   }
                 ]
@@ -1705,7 +1793,7 @@
           },
           "position": {
             "x": 0,
-            "y": 19,
+            "y": 24,
             "width": 12,
             "height": 6
           }
@@ -1903,11 +1991,11 @@
                 "showTitle": true,
                 "showDescription": true,
                 "title": {
-                  "value": "Catalog reach by content age over time",
+                  "value": "Is older content consistently seen less? (Catalog reach by content age over time)",
                   "fields": []
                 },
                 "description": {
-                  "value": "Share of live items in each age band with at least one content event from a regular user in the month. All bands rise as active users grow, so focus on the gap between the lines: a persistent gap means older content is consistently less discovered. Starts in 2025; earlier months have too few new items for a stable rate.",
+                  "value": "Share of live items in each age band with at least one content event from a regular user in the month. All bands rise as active users grow, so focus on the gap between the lines: a persistent gap means older content is consistently less discovered. Starts in 2025; earlier months have too few new items for a stable rate.\n\n<span style=\"color: #BF7080;\">The shaded band shows where the true value likely falls; when they overlap, the difference may be chance.</span>",
                   "fields": []
                 }
               },
@@ -1981,9 +2069,9 @@
           },
           "position": {
             "x": 0,
-            "y": 13,
+            "y": 15,
             "width": 12,
-            "height": 6
+            "height": 9
           }
         },
         {
@@ -2009,7 +2097,7 @@
           },
           "position": {
             "x": 0,
-            "y": 25,
+            "y": 30,
             "width": 12,
             "height": 5
           }
@@ -2026,7 +2114,7 @@
     },
     {
       "name": "2197523d",
-      "displayName": "Data Trust",
+      "displayName": "Data Trust (for data teams)",
       "layout": [
         {
           "widget": {
@@ -2046,7 +2134,7 @@
           },
           "position": {
             "x": 0,
-            "y": 0,
+            "y": 1,
             "width": 12,
             "height": 2
           }
@@ -2142,7 +2230,7 @@
           },
           "position": {
             "x": 0,
-            "y": 2,
+            "y": 3,
             "width": 12,
             "height": 6
           }
@@ -2224,7 +2312,7 @@
           },
           "position": {
             "x": 0,
-            "y": 8,
+            "y": 9,
             "width": 12,
             "height": 6
           }
@@ -2366,7 +2454,7 @@
           },
           "position": {
             "x": 0,
-            "y": 14,
+            "y": 15,
             "width": 12,
             "height": 6
           }
@@ -2457,9 +2545,32 @@
           },
           "position": {
             "x": 0,
-            "y": 20,
+            "y": 21,
             "width": 12,
             "height": 16
+          }
+        },
+        {
+          "widget": {
+            "name": "a8814ae0",
+            "spec": {
+              "widgetType": "text",
+              "version": 1,
+              "encodings": {
+                "text": {
+                  "lines": [
+                    "<span style=\"color: #BF7080;\">**This page shows how the raw data was checked and cleaned. Business users can skip it.**</span>"
+                  ],
+                  "fields": []
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
           }
         }
       ],
@@ -2470,6 +2581,11 @@
   "uiSettings": {
     "theme": {
       "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "genieSpace": {
+      "isEnabled": true,
+      "overrideId": "01f1de5672ca10e4bc5b90da57b69af2",
+      "enablementMode": "ENABLED"
     },
     "applyModeEnabled": false
   }
